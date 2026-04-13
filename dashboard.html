@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script defer src="js/guard.js"></script>
+  <script defer src="js/dashboard.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container nav">
+      <div class="brand">IELTS Writing Evaluator</div>
+      <nav>
+        <a href="history.html" class="nav-link">Essay history</a>
+        <button id="logout-btn" class="btn btn-small">Log out</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container page-section">
+    <h1>Your dashboard</h1>
+    <p id="user-email"></p>
+
+    <div class="three-col">
+      <div class="card">
+        <h2>New essay</h2>
+        <p>Submit a new essay for evaluation later.</p>
+      </div>
+      <div class="card">
+        <h2>Recent results</h2>
+        <p>Your latest scores will appear here.</p>
+      </div>
+      <div class="card">
+        <h2>Progress</h2>
+        <p>Your band trends will appear here later.</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
