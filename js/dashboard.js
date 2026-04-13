@@ -21,6 +21,15 @@
   const latestResultEl = document.getElementById("latest-result");
   const recentEvaluationsEl = document.getElementById("recent-evaluations");
 
+  const verificationPanel = document.getElementById("verification-panel");
+  const verifyScoreBtn = document.getElementById("verify-score-btn");
+  const verifyMessageEl = document.getElementById("verify-message");
+
+  let currentEssayId = null;
+  let currentTaskType = null;
+  let currentWordCount = null;
+  let currentEvaluation = null;
+
   essayForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -40,14 +49,17 @@
     }
 
     submitBtn.disabled = true;
+    verificationPanel.style.display = "none";
+    verifyMessageEl.textContent = "";
+    currentEssayId = null;
+    currentEvaluation = null;
+
     showMessage("Evaluating essay...", true, false);
 
     try {
       const {
         data: { session }
       } = await supabaseClient.auth.getSession();
-
-      console.log("Supabase session:", session);
 
       if (!session?.access_token) {
         showMessage("You are not logged in properly. Please log out and log back in.", false);
@@ -92,7 +104,7 @@
         return;
       }
 
-      if (!data || !data.evaluation) {
+      if (!data || !data.evaluation || !data.essay_id) {
         console.error("Unexpected response:", data);
         showMessage("The server returned an invalid response.", false);
         submitBtn.disabled = false;
@@ -102,8 +114,16 @@
       const result = data.evaluation;
       const wordCount = essayText.split(/\s+/).filter(Boolean).length;
 
-      renderLatestResult(result, taskType, wordCount);
-      renderRecentSubmission(result, taskType, wordCount);
+      currentEssayId = data.essay_id;
+      currentTaskType = taskType;
+      currentWordCount = wordCount;
+      currentEvaluation = result;
+
+      renderLatestResult(result, taskType, wordCount, false);
+      renderRecentSubmission(result, taskType, wordCount, false);
+
+      verificationPanel.style.display = "block";
+      verifyMessageEl.textContent = "";
 
       showMessage("Essay evaluated successfully.", true, true);
     } catch (err) {
@@ -111,6 +131,84 @@
       showMessage("Something went wrong while evaluating the essay.", false);
     } finally {
       submitBtn.disabled = false;
+    }
+  });
+
+  verifyScoreBtn?.addEventListener("click", async () => {
+    if (!currentEssayId || !currentEvaluation) {
+      verifyMessageEl.textContent = "No essay is available to verify.";
+      return;
+    }
+
+    verifyScoreBtn.disabled = true;
+    verifyMessageEl.textContent = "Verifying score...";
+
+    try {
+      const {
+        data: { session }
+      } = await supabaseClient.auth.getSession();
+
+      if (!session?.access_token) {
+        verifyMessageEl.textContent = "You are not logged in properly. Please log out and log back in.";
+        verifyScoreBtn.disabled = false;
+        return;
+      }
+
+      const response = await fetch(
+        "https://njuymuqeevkuqfubimio.supabase.co/functions/v1/verify-score",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qdXltdXFlZXZrdXFmdWJpbWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjM2NDMsImV4cCI6MjA5MTU5OTY0M30.W--9HT9lIYAwXcM5_AyCKQzML04H5UhxFF7YtK4hkns"
+          },
+          body: JSON.stringify({
+            essay_id: currentEssayId
+          })
+        }
+      );
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Could not parse verifier response as JSON:", jsonError);
+        verifyMessageEl.textContent = "The verifier returned an unreadable response.";
+        verifyScoreBtn.disabled = false;
+        return;
+      }
+
+      if (!response.ok) {
+        console.error("Verifier response error:", data);
+        verifyMessageEl.textContent =
+          data?.details || data?.error || "Could not verify the score.";
+        verifyScoreBtn.disabled = false;
+        return;
+      }
+
+      if (!data || !data.evaluation || !data.verification) {
+        console.error("Unexpected verifier response:", data);
+        verifyMessageEl.textContent = "The verifier returned an invalid response.";
+        verifyScoreBtn.disabled = false;
+        return;
+      }
+
+      currentEvaluation = data.evaluation;
+
+      renderLatestResult(data.evaluation, currentTaskType, currentWordCount, true, data.verification);
+      renderRecentSubmission(data.evaluation, currentTaskType, currentWordCount, true);
+
+      verifyMessageEl.textContent = data.verification.agrees_with_original_score
+        ? "Verification confirmed the original score."
+        : "Verification adjusted the score.";
+
+      verifyScoreBtn.style.display = "none";
+    } catch (err) {
+      console.error("Verification error:", err);
+      verifyMessageEl.textContent = "Something went wrong while verifying the score.";
+    } finally {
+      verifyScoreBtn.disabled = false;
     }
   });
 
@@ -123,12 +221,12 @@
     }
   }
 
-  function renderLatestResult(result, taskType, wordCount) {
+  function renderLatestResult(result, taskType, wordCount, isVerified = false, verification = null) {
     latestResultEl.innerHTML = `
       <div class="result-block">
         <div class="score-grid">
           <div class="score-item">
-            <strong>Overall Band</strong>
+            <strong>${isVerified ? "Verified Band" : "Overall Band"}</strong>
             <span>${safe(result.estimated_overall_band)}</span>
           </div>
           <div class="score-item">
@@ -192,21 +290,25 @@
         <div class="result-section">
           <h3>Submission details</h3>
           <p><strong>Task type:</strong> ${formatTaskType(taskType)}</p>
+          <p><strong>Status:</strong> ${isVerified ? "Verified" : "Scored"}</p>
+          ${verification ? `<p><strong>Verification confidence:</strong> ${safe(verification.verifier_confidence)}</p>` : ""}
+          ${verification ? `<p><strong>Adjustment reason:</strong> ${safe(verification.adjustment_reason)}</p>` : ""}
         </div>
       </div>
     `;
   }
 
-  function renderRecentSubmission(result, taskType, wordCount) {
+  function renderRecentSubmission(result, taskType, wordCount, isVerified = false) {
     const now = new Date();
 
     recentEvaluationsEl.innerHTML = `
       <div class="recent-item">
         <p><strong>Latest submission</strong></p>
         <p><strong>Task type:</strong> ${formatTaskType(taskType)}</p>
-        <p><strong>Overall band:</strong> ${safe(result.estimated_overall_band)}</p>
+        <p><strong>${isVerified ? "Verified band" : "Overall band"}:</strong> ${safe(result.estimated_overall_band)}</p>
         <p><strong>Word count:</strong> ${wordCount}</p>
-        <p class="muted-text">Submitted at: ${now.toLocaleString()}</p>
+        <p><strong>Status:</strong> ${isVerified ? "Verified" : "Scored"}</p>
+        <p class="muted-text">Updated at: ${now.toLocaleString()}</p>
       </div>
     `;
   }
