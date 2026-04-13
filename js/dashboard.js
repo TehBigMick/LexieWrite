@@ -21,71 +21,6 @@
   const latestResultEl = document.getElementById("latest-result");
   const recentEvaluationsEl = document.getElementById("recent-evaluations");
 
-  const renderDemoResult = (taskType, essayText) => {
-    const wordCount = essayText
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length;
-
-    latestResultEl.innerHTML = `
-      <div class="result-block">
-        <p><strong>Status:</strong> Frontend ready. Supabase scoring connection not added yet.</p>
-
-        <div class="score-grid">
-          <div class="score-item">
-            <strong>Overall Band</strong>
-            <span>--</span>
-          </div>
-          <div class="score-item">
-            <strong>Task</strong>
-            <span>--</span>
-          </div>
-          <div class="score-item">
-            <strong>Coherence</strong>
-            <span>--</span>
-          </div>
-          <div class="score-item">
-            <strong>Lexical</strong>
-            <span>--</span>
-          </div>
-          <div class="score-item">
-            <strong>Grammar</strong>
-            <span>--</span>
-          </div>
-          <div class="score-item">
-            <strong>Word Count</strong>
-            <span>${wordCount}</span>
-          </div>
-        </div>
-
-        <div class="result-section">
-          <h3>Submission details</h3>
-          <p><strong>Task type:</strong> ${formatTaskType(taskType)}</p>
-        </div>
-
-        <div class="result-section">
-          <h3>What happens next</h3>
-          <ul>
-            <li>The essay form is now working on the page.</li>
-            <li>The scoring function and database save step still need to be connected.</li>
-          </ul>
-        </div>
-      </div>
-    `;
-  };
-
-  const renderRecentPlaceholder = (taskType, wordCount) => {
-    const now = new Date();
-    recentEvaluationsEl.innerHTML = `
-      <div class="recent-item">
-        <p><strong>Most recent submission</strong></p>
-        <p>Task type: ${formatTaskType(taskType)}</p>
-        <p>Word count: ${wordCount}</p>
-        <p class="muted-text">Submitted at: ${now.toLocaleString()}</p>
-      </div>
-    `;
-  };
-
   essayForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -95,28 +30,160 @@
     const essayText = document.getElementById("essay-text").value.trim();
 
     if (!essayText) {
-      messageEl.textContent = "Please paste an essay before submitting.";
-      messageEl.classList.remove("success");
+      showMessage("Please paste an essay before submitting.", false);
+      return;
+    }
+
+    if (essayText.split(/\s+/).filter(Boolean).length < 20) {
+      showMessage("The essay is too short to evaluate properly.", false);
       return;
     }
 
     submitBtn.disabled = true;
-    messageEl.textContent = "Essay received. Frontend submission is working.";
-    messageEl.classList.add("success");
+    showMessage("Evaluating essay...", true, false);
 
-    const wordCount = essayText.split(/\s+/).filter(Boolean).length;
+    try {
+      const { data, error } = await supabaseClient.functions.invoke("score-essay", {
+        body: {
+          task_type: taskType,
+          prompt_text: promptText,
+          essay_text: essayText
+        }
+      });
 
-    renderDemoResult(taskType, essayText);
-    renderRecentPlaceholder(taskType, wordCount);
+      if (error) {
+        console.error("Function invoke error:", error);
+        showMessage("Could not evaluate the essay. Please try again.", false);
+        submitBtn.disabled = false;
+        return;
+      }
 
-    console.log("Essay form submission ready for backend connection:", {
-      task_type: taskType,
-      prompt_text: promptText,
-      essay_text: essayText
-    });
+      if (!data || !data.evaluation) {
+        console.error("Unexpected response:", data);
+        showMessage("The server returned an invalid response.", false);
+        submitBtn.disabled = false;
+        return;
+      }
 
-    submitBtn.disabled = false;
+      const result = data.evaluation;
+      const wordCount = essayText.split(/\s+/).filter(Boolean).length;
+
+      renderLatestResult(result, taskType, wordCount);
+      renderRecentSubmission(result, taskType, wordCount);
+
+      showMessage("Essay evaluated successfully.", true, true);
+    } catch (err) {
+      console.error("Dashboard error:", err);
+      showMessage("Something went wrong while evaluating the essay.", false);
+    } finally {
+      submitBtn.disabled = false;
+    }
   });
+
+  function showMessage(text, success = true, boxed = false) {
+    messageEl.textContent = text;
+    messageEl.classList.remove("success");
+
+    if (success && boxed) {
+      messageEl.classList.add("success");
+    }
+  }
+
+  function renderLatestResult(result, taskType, wordCount) {
+    latestResultEl.innerHTML = `
+      <div class="result-block">
+        <div class="score-grid">
+          <div class="score-item">
+            <strong>Overall Band</strong>
+            <span>${safe(result.estimated_overall_band)}</span>
+          </div>
+          <div class="score-item">
+            <strong>Task</strong>
+            <span>${safe(result.criterion_scores.task_achievement_or_response.band)}</span>
+          </div>
+          <div class="score-item">
+            <strong>Coherence</strong>
+            <span>${safe(result.criterion_scores.coherence_and_cohesion.band)}</span>
+          </div>
+          <div class="score-item">
+            <strong>Lexical</strong>
+            <span>${safe(result.criterion_scores.lexical_resource.band)}</span>
+          </div>
+          <div class="score-item">
+            <strong>Grammar</strong>
+            <span>${safe(result.criterion_scores.grammatical_range_and_accuracy.band)}</span>
+          </div>
+          <div class="score-item">
+            <strong>Word Count</strong>
+            <span>${wordCount}</span>
+          </div>
+        </div>
+
+        <div class="result-section">
+          <h3>Summary</h3>
+          <p>${safe(result.brief_summary)}</p>
+        </div>
+
+        <div class="result-section">
+          <h3>Criterion feedback</h3>
+          <ul>
+            <li><strong>Task:</strong> ${safe(result.criterion_scores.task_achievement_or_response.feedback)}</li>
+            <li><strong>Coherence:</strong> ${safe(result.criterion_scores.coherence_and_cohesion.feedback)}</li>
+            <li><strong>Lexical:</strong> ${safe(result.criterion_scores.lexical_resource.feedback)}</li>
+            <li><strong>Grammar:</strong> ${safe(result.criterion_scores.grammatical_range_and_accuracy.feedback)}</li>
+          </ul>
+        </div>
+
+        <div class="result-section">
+          <h3>Strengths</h3>
+          <ul>
+            ${renderListItems(result.strengths)}
+          </ul>
+        </div>
+
+        <div class="result-section">
+          <h3>Main issues</h3>
+          <ul>
+            ${renderListItems(result.main_issues)}
+          </ul>
+        </div>
+
+        <div class="result-section">
+          <h3>Two actionable next steps</h3>
+          <ul>
+            ${renderListItems(result.two_action_points)}
+          </ul>
+        </div>
+
+        <div class="result-section">
+          <h3>Submission details</h3>
+          <p><strong>Task type:</strong> ${formatTaskType(taskType)}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderRecentSubmission(result, taskType, wordCount) {
+    const now = new Date();
+
+    recentEvaluationsEl.innerHTML = `
+      <div class="recent-item">
+        <p><strong>Latest submission</strong></p>
+        <p><strong>Task type:</strong> ${formatTaskType(taskType)}</p>
+        <p><strong>Overall band:</strong> ${safe(result.estimated_overall_band)}</p>
+        <p><strong>Word count:</strong> ${wordCount}</p>
+        <p class="muted-text">Submitted at: ${now.toLocaleString()}</p>
+      </div>
+    `;
+  }
+
+  function renderListItems(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return "<li>No details available.</li>";
+    }
+
+    return items.map(item => `<li>${safe(item)}</li>`).join("");
+  }
 
   function formatTaskType(taskType) {
     switch (taskType) {
@@ -129,5 +196,18 @@
       default:
         return taskType;
     }
+  }
+
+  function safe(value) {
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
   }
 })();
