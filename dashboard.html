@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard</title>
+  <title>Dashboard | LexieWrite</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js"></script>
@@ -13,32 +13,86 @@
 <body>
   <header class="site-header">
     <div class="container nav">
-      <div class="brand">IELTS Writing Evaluator</div>
-      <nav>
+      <div class="brand">LexieWrite</div>
+      <nav class="nav-actions">
         <a href="history.html" class="nav-link">Essay history</a>
-        <button id="logout-btn" class="btn btn-small">Log out</button>
+        <button id="logout-btn" class="btn btn-small" type="button">Log out</button>
       </nav>
     </div>
   </header>
 
   <main class="container page-section">
-    <h1>Your dashboard</h1>
-    <p id="user-email"></p>
+    <section class="page-intro">
+      <h1>Your dashboard</h1>
+      <p id="user-email" class="muted-text"></p>
+      <p class="muted-text">
+        Submit an IELTS essay for evaluation and review your latest feedback.
+      </p>
+    </section>
 
-    <div class="three-col">
-      <div class="card">
-        <h2>New essay</h2>
-        <p>Submit a new essay for evaluation later.</p>
+    <section class="dashboard-grid">
+      <div class="card dashboard-main-card">
+        <h2>Evaluate a new essay</h2>
+
+        <form id="essay-form" class="essay-form">
+          <label for="task-type">Task type</label>
+          <select id="task-type" required>
+            <option value="academic_task_1">Academic Task 1</option>
+            <option value="academic_task_2" selected>Academic Task 2</option>
+            <option value="general_task_1">General Task 1</option>
+          </select>
+
+          <label for="essay-prompt">Essay prompt</label>
+          <textarea
+            id="essay-prompt"
+            rows="5"
+            placeholder="Paste the IELTS task prompt here"
+          ></textarea>
+
+          <label for="essay-text">Essay text</label>
+          <textarea
+            id="essay-text"
+            rows="14"
+            required
+            placeholder="Paste the essay here"
+          ></textarea>
+
+          <button type="submit" class="btn full-width">Evaluate essay</button>
+        </form>
+
+        <p id="essay-message" class="message"></p>
       </div>
+
+      <aside class="dashboard-side-column">
+        <div class="card">
+          <h2>Latest result</h2>
+          <div id="latest-result" class="result-placeholder">
+            <p>No evaluation yet.</p>
+            <p class="muted-text">
+              Your most recent estimated band score and feedback will appear here.
+            </p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Quick notes</h2>
+          <ul class="info-list">
+            <li>Choose the correct IELTS task type before submitting.</li>
+            <li>Include the original task prompt for more accurate evaluation.</li>
+            <li>Longer essays may take a little more time to process.</li>
+          </ul>
+        </div>
+      </aside>
+    </section>
+
+    <section class="recent-section">
       <div class="card">
-        <h2>Recent results</h2>
-        <p>Your latest scores will appear here.</p>
+        <h2>Recent evaluations</h2>
+        <div id="recent-evaluations">
+          <p class="muted-text">No saved evaluations to show yet.</p>
+        </div>
       </div>
-      <div class="card">
-        <h2>Progress</h2>
-        <p>Your band trends will appear here later.</p>
-      </div>
-    </div>
+    </section>
   </main>
 </body>
 </html>
