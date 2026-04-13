@@ -62,7 +62,7 @@
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${session.access_token}`,
-            "apikey": "sb_publishable_uIK6LBTvH73j1fKDGRUK3w_VvetxoFB"
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qdXltdXFlZXZrdXFmdWJpbWlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwMjM2NDMsImV4cCI6MjA5MTU5OTY0M30.W--9HT9lIYAwXcM5_AyCKQzML04H5UhxFF7YtK4hkns"
           },
           body: JSON.stringify({
             task_type: taskType,
