@@ -43,17 +43,51 @@
     showMessage("Evaluating essay...", true, false);
 
     try {
-      const { data, error } = await supabaseClient.functions.invoke("score-essay", {
-        body: {
-          task_type: taskType,
-          prompt_text: promptText,
-          essay_text: essayText
-        }
-      });
+      const {
+        data: { session }
+      } = await supabaseClient.auth.getSession();
 
-      if (error) {
-        console.error("Function invoke error:", error);
-        showMessage("Could not evaluate the essay. Please try again.", false);
+      console.log("Supabase session:", session);
+
+      if (!session?.access_token) {
+        showMessage("You are not logged in properly. Please log out and log back in.", false);
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const response = await fetch(
+        "https://njuymuqeevkuqfubimio.supabase.co/functions/v1/score-essay",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+            "apikey": "sb_publishable_uIK6LBTvH73j1fKDGRUK3w_VvetxoFB"
+          },
+          body: JSON.stringify({
+            task_type: taskType,
+            prompt_text: promptText,
+            essay_text: essayText
+          })
+        }
+      );
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("Could not parse function response as JSON:", jsonError);
+        showMessage("The server returned an unreadable response.", false);
+        submitBtn.disabled = false;
+        return;
+      }
+
+      if (!response.ok) {
+        console.error("Function response error:", data);
+        showMessage(
+          data?.details || data?.error || "Could not evaluate the essay. Please try again.",
+          false
+        );
         submitBtn.disabled = false;
         return;
       }
