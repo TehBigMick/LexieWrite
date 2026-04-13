@@ -20,10 +20,7 @@ signupForm?.addEventListener("submit", async (e) => {
 
   const { error } = await supabaseClient.auth.signUp({
     email,
-    password,
-    options: {
-      emailRedirectTo: "https://www.lexiewrite.com/verify.html"
-    }
+    password
   });
 
   if (error) {
