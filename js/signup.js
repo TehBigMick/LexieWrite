@@ -17,7 +17,7 @@ signupForm?.addEventListener("submit", async (e) => {
     email,
     password,
     options: {
-      emailRedirectTo: "https://YOURDOMAIN.com/verify.html"
+      emailRedirectTo: "https://www.lexiewrite.com/verify.html"
     }
   });
 
